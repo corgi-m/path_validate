@@ -3,6 +3,8 @@ import random
 
 from Crypto.PublicKey import RSA
 
+from tools.strtool import strcat
+
 
 class RSAManager:
     skdir = 'keys/sk/'
@@ -16,24 +18,30 @@ class RSAManager:
         return SK, PK
 
     @classmethod
-    def save_keys(cls, seed, node_name, SK, PK):
-        if not os.path.exists(cls.skdir + seed):
-            os.mkdir(cls.skdir + seed)
-        if not os.path.exists(cls.pkdir + seed):
-            os.mkdir(cls.pkdir + seed)
-        with open(cls.skdir + seed + '/' + node_name, 'wb') as f:
+    def save_keys(cls, seed, id, SK, PK):
+        skdir = strcat(cls.skdir, seed)
+        pkdir = strcat(cls.pkdir, seed)
+        skpath = strcat(skdir, '/', id)
+        pkpath = strcat(pkdir, '/', id)
+        if not os.path.exists(skdir):
+            os.mkdir(skdir)
+        if not os.path.exists(pkdir):
+            os.mkdir(pkdir)
+        with open(skpath, 'wb') as f:
             f.write(SK)
-        with open(cls.pkdir + seed + '/' + node_name, 'wb') as f:
+        with open(pkpath, 'wb') as f:
             f.write(PK)
 
     @classmethod
-    def load_keys(cls, seed, node_name):
-        if not os.path.exists(cls.skdir + seed + '/' + node_name) or not os.path.exists(cls.pkdir + seed + '/' + node_name):
+    def load_keys(cls, seed, id):
+        skpath = strcat(cls.skdir, seed, '/', id)
+        pkpath = strcat(cls.pkdir, seed, '/', id)
+        if not os.path.exists(skpath) or not os.path.exists(pkpath):
             SK, PK = cls.generate_key_pair()
-            cls.save_keys(seed, node_name, SK, PK)
+            cls.save_keys(seed, id, SK, PK)
         else:
-            with open(cls.skdir + seed + '/' + node_name, 'rb') as f:
+            with open(skpath, 'rb') as f:
                 SK = f.read()
-            with open(cls.pkdir + seed + '/' + node_name, 'rb') as f:
+            with open(pkpath, 'rb') as f:
                 PK = f.read()
         return SK, PK

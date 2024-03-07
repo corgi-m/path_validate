@@ -1,5 +1,6 @@
-import networkx as nx
 import random
+
+import networkx as nx
 
 
 def topology_generate(num_node=400):

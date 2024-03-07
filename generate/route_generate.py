@@ -1,5 +1,6 @@
-import networkx as nx
 import random
+
+import networkx as nx
 
 
 def route_generate(G, num_paths_to_select=30):
@@ -19,6 +20,6 @@ def route_generate(G, num_paths_to_select=30):
         path = nx.shortest_path(G, start_node, end_node)
 
         paths_selected += 1
-        paths.append((start_node, end_node, path))
+        paths.append(path)
 
     return paths
