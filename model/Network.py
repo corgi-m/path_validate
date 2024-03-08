@@ -2,10 +2,9 @@ import os
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from model.GenFactory import GenFactory
+from controller.GenFactory import GenFactory
 from model.Package import OPTPackage
-from model.RSAManager import RSAManager
-from tools.tools import strcat
+from tools.tools import strcat, load_obj
 
 
 class Network:
@@ -26,48 +25,76 @@ class Network:
             cls.instance = super().__new__(cls)
         return cls.instance
 
-    def init_network(self):
-        for node_index in self.G.nodes:
-            self.__nodes[node_index] = Node(node_index)
+    def set_nodes(self, index):
+        self.__nodes[index] = Node(index)
+        time.sleep(0)
 
-        edge_index = 0
-        for edge in self.G.edges:
-            self.__edges[edge_index] = Channel(edge_index, self.__nodes[edge[0]], self.__nodes[edge[1]])
-            self.__nodes[edge[0]].add_route(self.__nodes[edge[1]], self.__edges[edge_index])
-            edge_index += 1
-            self.__edges[edge_index] = Channel(edge_index, self.__nodes[edge[1]], self.__nodes[edge[0]])
-            self.__nodes[edge[1]].add_route(self.__nodes[edge[0]], self.__edges[edge_index])
-            edge_index += 1
+    def set_edges(self, param):
+        index = param[0]
+        edge = param[1]
+        self.__edges[2 * index] = (Channel(2 * index, self.__nodes[edge[0]], self.__nodes[edge[1]]))
+        self.__nodes[edge[0]].add_route(self.__nodes[edge[1]], self.__edges[2 * index])
+        self.__edges[2 * index + 1] = Channel(2 * index + 1, self.__nodes[edge[1]], self.__nodes[edge[0]])
+        self.__nodes[edge[1]].add_route(self.__nodes[edge[0]], self.__edges[2 * index + 1])
+
+    def init_network(self):
+        with ThreadPoolExecutor(max_workers=len(self.G.nodes)) as executor:
+            try:
+                results = executor.map(self.set_nodes, self.G.nodes)
+            except Exception as e:
+                print(str(e))
+            for _ in results:
+                ...
+
+        with ThreadPoolExecutor(max_workers=len(self.G.edges)) as executor:
+            try:
+                results = executor.map(self.set_edges, enumerate(self.G.edges))
+            except Exception as e:
+                print(str(e))
+            for _ in results:
+                ...
+    def source_add_package(self, route):
+        source = self.get_node(route[0])
+        destination = self.get_node(route[-1])
+        PATH = [self.get_node(i) for i in route]
+        package = OPTPackage()
+        payload = GenFactory.gen_payload()
+        Ki = GenFactory.gen_Ki(package, source, destination, PATH)
+        package.initialization(PK=source.PK, Ki=Ki, PATH=PATH, payload=payload)
+        source.add_package(package)
+
 
     def init_package(self):
-        for route in self.ROUTE:
-            source = self.get_node(route[0])
-            destination = self.get_node(route[-1])
-            PATH = [self.get_node(i) for i in route]
-
-            package = OPTPackage()
-            payload = GenFactory.gen_payload()
-            Ki = GenFactory.gen_Ki(package, source, destination, PATH)
-            package.initialization(PK=source.PK, Ki=Ki, PATH=PATH, payload=payload)
-            source.add_package(package)
-
-    def network_start(self):
-        do = lambda x: x.forward()
         with ThreadPoolExecutor(max_workers=len(self.__nodes)) as executor:
             try:
-                results = executor.map(do, list(self.__nodes.values()))
+                results = executor.map(self.source_add_package, self.ROUTE)
             except Exception as e:
                 print(str(e))
         executor.shutdown(wait=True)
 
+
+    def network_start(self):
+        forward_start = lambda x: x.forward()
+        with ThreadPoolExecutor(max_workers=len(self.__nodes)) as executor:
+            try:
+                results = executor.map(forward_start, list(self.__nodes.values()))
+            except Exception as e:
+                print(str(e))
+        executor.shutdown(wait=True)
+
+
     @classmethod
+
+
     def set_incomplete(cls, param):
         cls.incomplete = param
+
 
     @classmethod
     def complete(cls):
         cls.incomplete -= 1
         return cls.incomplete
+
 
     @classmethod
     def is_complete(cls):
@@ -76,14 +103,18 @@ class Network:
         else:
             return False
 
+
     def get_nodes(self):
         return self.__nodes
+
 
     def get_node(self, id):
         return self.__nodes[id]
 
+
     def get_edges(self):
         return self.__edges
+
 
     def get_edge(self, id):
         return self.__edges[id]
@@ -95,7 +126,7 @@ class Node:
         self.__routing_table = {}  # 路由表
         self.packages = []
         self.Ki = {}
-        (self.SK, self.PK) = RSAManager.load_keys(os.getenv('RandomSeed'), self.__id)
+        (self.SK, self.PK) = load_obj('record/keys/pk_sk', os.getenv('RandomSeed'), self.__id, GenFactory.gen_SK_PK)
 
     def __repr__(self):
         return strcat("Node ", self.__id)
@@ -137,8 +168,7 @@ class Node:
                 Channel.transfer(package)
             if Network.is_complete():
                 break
-            time.sleep(1)
-
+            time.sleep(0)
 
     def drop(self, package):
         leave = Network.complete()
@@ -178,7 +208,7 @@ class Channel:
         self.__data = data
 
     def __repr__(self):
-        return strcat("Channel ", self.__id, ': ', self.__source, ' -> ', self.__destination)
+        return strcat("Channel ", self.__id, ': ', self.__source.get_id(), ' -> ', self.__destination.get_id())
 
     def get_id(self):
         return self.__id

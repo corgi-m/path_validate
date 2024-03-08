@@ -1,4 +1,4 @@
-from model.HASHManager import HASHManager
+from controller.HASHManager import HASHManager
 from tools.tools import get_timestamp
 from tools.tools import strcat
 
@@ -56,6 +56,7 @@ class OPTPackage:
 
     def R_validation(self, Ki, i):
         opv_ = self.MAC(Ki, strcat(self.pvf, self.datahash, self.R[i - 1], self.timestamp))
+        print(strcat(i,': ',self.opv[i],' = ',opv_))
         if self.opv[i] == opv_:
             self.pvf = self.MAC(Ki, self.pvf)
             return True

@@ -1,3 +1,5 @@
+import os
+import pickle
 import time
 
 import networkx as nx
@@ -35,3 +37,21 @@ def draw_topology(G, ROUTE):
     # 显示图形
     plt.title('Autonomous System Topology with Cross Connections (400 ASes)')
     plt.show()
+
+
+def save_obj(path, obj):
+    with open(path, 'wb') as f:
+        pickle.dump(obj, f)
+
+
+def load_obj(path, seed, filename, gen_obj, **kwargs):
+    dir = strcat(path, '/', seed)
+    os.makedirs(dir, exist_ok=True)
+    path = strcat(dir, '/', filename)
+    if not os.path.exists(path) or os.getenv('Cache')!='True':
+        obj = gen_obj(*kwargs.values())
+        save_obj(path, obj)
+    else:
+        with open(path, 'rb') as f:
+            obj = pickle.load(f)
+    return obj

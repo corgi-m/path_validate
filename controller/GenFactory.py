@@ -1,6 +1,7 @@
 import random
 
 import networkx as nx
+from Crypto.PublicKey import RSA
 
 from model.Package import OPTPackage
 
@@ -73,3 +74,10 @@ class GenFactory:
             destination.add_Ki(package, PATH[i], Ki[i])
             PATH[i].add_Ki(package, source, Ki[i])
         return Ki
+
+    @staticmethod
+    def gen_SK_PK():
+        key = RSA.generate(1024, random.randbytes)
+        SK = key.export_key()
+        PK = key.publickey().export_key()
+        return SK, PK
