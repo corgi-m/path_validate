@@ -1,5 +1,25 @@
+import time
+
 import networkx as nx
-import matplotlib.pyplot as plt
+from matplotlib import pyplot as plt
+
+
+def to_bytes(obj):
+    if isinstance(obj, bytes):
+        return obj
+    return obj.encode('utf-8')
+
+
+def strcat(*args):
+    result = ""
+    for i in args:
+        result += str(i)
+    return result
+
+
+def get_timestamp():
+    return round(time.time() * 1000)
+
 
 def draw_topology(G, ROUTE):
     # 绘制图形

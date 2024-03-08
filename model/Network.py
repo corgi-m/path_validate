@@ -1,38 +1,72 @@
 import os
-import random
-import time
-from asyncio import sleep
 from concurrent.futures import ThreadPoolExecutor
 
+from model.GenFactory import GenFactory
 from model.Package import OPTPackage
 from model.RSAManager import RSAManager
-from tools.strtool import strcat
+from tools.tools import strcat
 
 
 class Network:
     instance = None
+    incomplete = 0
 
-    def __init__(self, ):
+    def __init__(self, G, ROUTE):
         self.__nodes = {}
         self.__edges = {}
+        self.G = G
+        self.ROUTE = ROUTE
+        self.set_incomplete(len(ROUTE))
+        self.init_network()
+        self.init_package()
 
     def __new__(cls, *args, **kwargs):
         if cls.instance is None:
             cls.instance = super().__new__(cls)
         return cls.instance
 
-    def set_network(self, G):
-        for node_index in G.nodes:
+    def init_network(self):
+        for node_index in self.G.nodes:
             self.__nodes[node_index] = Node(node_index)
 
         edge_index = 0
-        for edge in G.edges:
+        for edge in self.G.edges:
             self.__edges[edge_index] = Channel(edge_index, self.__nodes[edge[0]], self.__nodes[edge[1]])
             self.__nodes[edge[0]].add_route(self.__nodes[edge[1]], self.__edges[edge_index])
             edge_index += 1
             self.__edges[edge_index] = Channel(edge_index, self.__nodes[edge[1]], self.__nodes[edge[0]])
             self.__nodes[edge[1]].add_route(self.__nodes[edge[0]], self.__edges[edge_index])
             edge_index += 1
+
+    def init_package(self):
+        for route in self.ROUTE:
+            source = self.get_node(route[0])
+            destination = self.get_node(route[-1])
+            PATH = [self.get_node(i) for i in route]
+
+            package = OPTPackage()
+            payload = GenFactory.gen_payload()
+            Ki = GenFactory.gen_Ki(package, source, destination, PATH)
+            package.initialization(PK=source.PK, Ki=Ki, PATH=PATH, payload=payload)
+            source.add_package(package)
+
+    def network_start(self):
+        do = lambda x: x.forward()
+        with ThreadPoolExecutor(max_workers=len(self.__nodes)) as executor:
+            results = executor.map(do, list(self.__nodes.values()))
+        executor.shutdown(wait=True)
+
+    @classmethod
+    def complete(cls):
+        cls.incomplete -= 1
+        return cls.incomplete
+
+    @classmethod
+    def is_complete(cls):
+        if cls.incomplete == 0:
+            return True
+        else:
+            return False
 
     def get_nodes(self):
         return self.__nodes
@@ -46,45 +80,9 @@ class Network:
     def get_edge(self, id):
         return self.__edges[id]
 
-    def init_package(self, ROUTE):
-        for route in ROUTE:
-            source = self.get_node(route[0])
-            destination = self.get_node(route[-1])
-            PATH = [self.get_node(i) for i in route]
-
-            package = OPTPackage()
-            payload = self.gen_payload()
-            Ki = self.gen_Ki(package, source, destination, PATH)
-            package.initialization(PK=source.PK, Ki=Ki, PATH=PATH, payload=payload)
-            source.add_package(package)
-
-    def do(self, i):
-        i.forward()
-
-    def network_start(self):
-        with ThreadPoolExecutor(max_workers=len(self.__nodes)) as executor:
-        #with ThreadPoolExecutor(max_workers=1) as executor:
-            results = executor.map(self.do, list(self.__nodes.values()))
-        executor.shutdown(wait=True)
-        for result in results:
-            print(1)
-        #self.do(list(self.__nodes.values())[0])
-
-    def gen_payload(self, size=1):
-        size = random.randint(1, 65535) if size is None else size
-        payload = random.randbytes(size)
-        return payload
-
-    def gen_Ki(self, package, source, destination, PATH):
-        Ki = []
-        for i in PATH:
-            key = random.randbytes(32)
-            Ki.append(key)  # aes = AES.new(key[:16], AES.MODE_EAX, nonce=key[16:])
-        for i in range(len(Ki)):
-            source.add_Ki(package, PATH[i], Ki[i])
-            destination.add_Ki(package, PATH[i], Ki[i])
-            PATH[i].add_Ki(package, source, Ki[i])
-        return Ki
+    @classmethod
+    def set_incomplete(cls, param):
+        cls.incomplete = param
 
 
 class Node:
@@ -133,12 +131,12 @@ class Node:
             if True or package.D_validation(Ki, Kd):
                 self.succeed(package)
             else:
-                self.drop()
+                self.drop(package)
         else:
             if True or package.R_validation(self.Ki[package][source], I):
                 self.process(package)
             else:
-                self.drop()
+                self.drop(package)
 
     def forward(self):
         while True:
@@ -150,13 +148,16 @@ class Node:
                 R_next = PATH[I + 1]
                 Channel = self.__routing_table[R_next]
                 Channel.transfer(package)
+            if Network.is_complete():
+                break
 
-
-    def drop(self):
-        ...
+    def drop(self, package):
+        leave = Network.complete()
+        print(strcat(package.get_path(), 'drop', 'Network leave:', leave))
 
     def succeed(self, package):
-        print(strcat(package.get_path(),'finish'))
+        leave = Network.complete()
+        print(strcat(package.get_path(), 'finish', 'Network leave:', leave))
 
     def process(self, package):
         self.packages.append(package)

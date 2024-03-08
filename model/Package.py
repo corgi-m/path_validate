@@ -1,6 +1,6 @@
-from tools.crypto import calc_md5, calc_hmac
-from tools.strtool import strcat
-from tools.time import get_timestamp
+from model.HASHManager import HASHManager
+from tools.tools import get_timestamp
+from tools.tools import strcat
 
 
 class OPTPackage:
@@ -33,11 +33,11 @@ class OPTPackage:
 
     @staticmethod
     def H(message):
-        return calc_md5(message)
+        return HASHManager.calc_md5(message)
 
     @staticmethod
     def MAC(key, message):
-        return calc_hmac(key, message)
+        return HASHManager.calc_hmac(key, message)
 
     def initialization(self, PK, Ki, PATH, payload):
         self.R = PATH[1:]

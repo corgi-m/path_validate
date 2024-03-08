@@ -3,7 +3,7 @@ import random
 
 from Crypto.PublicKey import RSA
 
-from tools.strtool import strcat
+from tools.tools import strcat
 
 
 class RSAManager:
