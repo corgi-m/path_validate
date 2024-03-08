@@ -23,6 +23,12 @@ class RSAManager:
         pkdir = strcat(cls.pkdir, seed)
         skpath = strcat(skdir, '/', id)
         pkpath = strcat(pkdir, '/', id)
+        if not os.path.exists('keys'):
+            os.mkdir('keys')
+        if not os.path.exists(cls.skdir):
+            os.mkdir(cls.skdir)
+        if not os.path.exists(cls.pkdir):
+            os.mkdir(cls.pkdir)
         if not os.path.exists(skdir):
             os.mkdir(skdir)
         if not os.path.exists(pkdir):

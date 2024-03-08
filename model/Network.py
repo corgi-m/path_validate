@@ -1,4 +1,5 @@
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from model.GenFactory import GenFactory
@@ -53,8 +54,15 @@ class Network:
     def network_start(self):
         do = lambda x: x.forward()
         with ThreadPoolExecutor(max_workers=len(self.__nodes)) as executor:
-            results = executor.map(do, list(self.__nodes.values()))
+            try:
+                results = executor.map(do, list(self.__nodes.values()))
+            except Exception as e:
+                print(str(e))
         executor.shutdown(wait=True)
+
+    @classmethod
+    def set_incomplete(cls, param):
+        cls.incomplete = param
 
     @classmethod
     def complete(cls):
@@ -80,10 +88,6 @@ class Network:
     def get_edge(self, id):
         return self.__edges[id]
 
-    @classmethod
-    def set_incomplete(cls, param):
-        cls.incomplete = param
-
 
 class Node:
     def __init__(self, id):
@@ -102,6 +106,51 @@ class Node:
     def __hash__(self):
         return hash(self.__id)
 
+    def receive(self, package):
+        PATH = package.get_path()
+        I = PATH.index(self)
+        source = PATH[0]
+        destination = PATH[-1]
+        if I == len(PATH) - 1:
+            Ki = [self.Ki[package][i] for i in PATH[1:-1]]
+            Kd = self.Ki[package][destination]
+            if package.D_validation(Ki, Kd):
+                self.succeed(package)
+            else:
+                self.drop(package)
+        else:
+            Ki = self.Ki[package][source]
+            if package.R_validation(Ki, I):
+                self.process(package)
+            else:
+                self.drop(package)
+
+    def forward(self):
+        while True:
+            if len(self.packages) != 0:
+                package = self.packages[0]
+                self.packages = self.packages[1:]
+                PATH = package.get_path()
+                I = PATH.index(self)
+                R_next = PATH[I + 1]
+                Channel = self.__routing_table[R_next]
+                Channel.transfer(package)
+            if Network.is_complete():
+                break
+            time.sleep(1)
+
+
+    def drop(self, package):
+        leave = Network.complete()
+        print(strcat(package.get_path(), 'drop', 'Network leave:', leave))
+
+    def succeed(self, package):
+        leave = Network.complete()
+        print(strcat(package.get_path(), 'finish', 'Network leave:', leave))
+
+    def process(self, package):
+        self.packages.append(package)
+
     def get_id(self):
         return self.__id
 
@@ -119,48 +168,6 @@ class Node:
         if package not in self.Ki:
             self.Ki[package] = {}
         self.Ki[package][node] = Ki
-
-    def receive(self, package):
-        PATH = package.get_path()
-        I = PATH.index(self)
-        source = PATH[0]
-        destination = PATH[-1]
-        if I == len(PATH) - 1:
-            Ki = [self.Ki[package][i] for i in PATH[1:-1]]
-            Kd = self.Ki[package][destination]
-            if True or package.D_validation(Ki, Kd):
-                self.succeed(package)
-            else:
-                self.drop(package)
-        else:
-            if True or package.R_validation(self.Ki[package][source], I):
-                self.process(package)
-            else:
-                self.drop(package)
-
-    def forward(self):
-        while True:
-            if len(self.packages) != 0:
-                package = self.packages[0]
-                self.packages = self.packages[1:]
-                PATH = package.get_path()
-                I = PATH.index(self)
-                R_next = PATH[I + 1]
-                Channel = self.__routing_table[R_next]
-                Channel.transfer(package)
-            if Network.is_complete():
-                break
-
-    def drop(self, package):
-        leave = Network.complete()
-        print(strcat(package.get_path(), 'drop', 'Network leave:', leave))
-
-    def succeed(self, package):
-        leave = Network.complete()
-        print(strcat(package.get_path(), 'finish', 'Network leave:', leave))
-
-    def process(self, package):
-        self.packages.append(package)
 
 
 class Channel:

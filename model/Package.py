@@ -49,13 +49,12 @@ class OPTPackage:
         self.pvf = self.MAC(Ki[-1], self.datahash)
         pvf = self.pvf
         self.opv = [0 for i in range(len(self.R) + 1)]
-        for i, pa in enumerate(self.R[:-1], 1):
+        for i, pa in enumerate(self.R, 1):
             self.opv[i] = self.MAC(Ki[i], strcat(pvf, self.datahash, self.R[i - 1], self.timestamp))
             pvf = self.MAC(Ki[i], self.pvf)
         self.t = get_timestamp()
 
     def R_validation(self, Ki, i):
-
         opv_ = self.MAC(Ki, strcat(self.pvf, self.datahash, self.R[i - 1], self.timestamp))
         if self.opv[i] == opv_:
             self.pvf = self.MAC(Ki, self.pvf)
@@ -64,7 +63,7 @@ class OPTPackage:
             return False
 
     def D_validation(self, Ki, Kd):
-        K_ = Kd + Ki
+        K_ = [Kd] + Ki
         pvf_ = self.datahash
         for i in K_:
             pvf_ = self.MAC(i, pvf_)
