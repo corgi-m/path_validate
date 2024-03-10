@@ -4,6 +4,7 @@ import networkx as nx
 from Crypto.PublicKey import RSA
 
 from model.Package import OPTPackage
+from tools.tools import strcat
 
 
 class GenFactory:
@@ -66,13 +67,15 @@ class GenFactory:
     @staticmethod
     def gen_Ki(package, source, destination, PATH):
         Ki = []
-        for i in PATH:
+        for _ in PATH:
             key = random.randbytes(32)
             Ki.append(key)  # aes = AES.new(key[:16], AES.MODE_EAX, nonce=key[16:])
-        for i in range(len(Ki)):
+        for i in range(1, len(Ki)):
             source.add_Ki(package, PATH[i], Ki[i])
             destination.add_Ki(package, PATH[i], Ki[i])
             PATH[i].add_Ki(package, source, Ki[i])
+            #print(strcat(source.Ki[package].keys(), destination.Ki[package].keys(), PATH[i].Ki[package].keys()), source,destination,PATH[i])
+            #exit(0)
         return Ki
 
     @staticmethod

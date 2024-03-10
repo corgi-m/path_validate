@@ -1,10 +1,12 @@
 import os
+import queue
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
 from controller.GenFactory import GenFactory
 from model.Package import OPTPackage
-from tools.tools import strcat, load_obj
+from tools.tools import strcat, load_obj, check_Ki
 
 
 class Network:
@@ -53,23 +55,28 @@ class Network:
                 print(str(e))
             for _ in results:
                 ...
+
     def source_add_package(self, route):
         source = self.get_node(route[0])
         destination = self.get_node(route[-1])
         PATH = [self.get_node(i) for i in route]
+        #print(PATH)
         package = OPTPackage()
         payload = GenFactory.gen_payload()
-        Ki = GenFactory.gen_Ki(package, source, destination, PATH)
+        Ki = GenFactory.gen_Ki(package, source, destination, PATH)# 包含S、D
         package.initialization(PK=source.PK, Ki=Ki, PATH=PATH, payload=payload)
         source.add_package(package)
+        return package
 
 
     def init_package(self):
-        with ThreadPoolExecutor(max_workers=len(self.__nodes)) as executor:
+        with ThreadPoolExecutor(max_workers=1) as executor:
             try:
                 results = executor.map(self.source_add_package, self.ROUTE)
             except Exception as e:
                 print(str(e))
+            for result in results:
+                check_Ki(result)
         executor.shutdown(wait=True)
 
 
@@ -124,9 +131,10 @@ class Node:
     def __init__(self, id):
         self.__id = id
         self.__routing_table = {}  # 路由表
-        self.packages = []
+        self.packages = queue.Queue()
         self.Ki = {}
         (self.SK, self.PK) = load_obj('record/keys/pk_sk', os.getenv('RandomSeed'), self.__id, GenFactory.gen_SK_PK)
+        self.lock = threading.Lock()
 
     def __repr__(self):
         return strcat("Node ", self.__id)
@@ -150,6 +158,7 @@ class Node:
             else:
                 self.drop(package)
         else:
+
             Ki = self.Ki[package][source]
             if package.R_validation(Ki, I):
                 self.process(package)
@@ -158,9 +167,8 @@ class Node:
 
     def forward(self):
         while True:
-            if len(self.packages) != 0:
-                package = self.packages[0]
-                self.packages = self.packages[1:]
+            if not self.packages.empty():
+                package = self.packages.get()
                 PATH = package.get_path()
                 I = PATH.index(self)
                 R_next = PATH[I + 1]
@@ -179,7 +187,7 @@ class Node:
         print(strcat(package.get_path(), 'finish', 'Network leave:', leave))
 
     def process(self, package):
-        self.packages.append(package)
+        self.packages.put(package)
 
     def get_id(self):
         return self.__id
@@ -191,7 +199,7 @@ class Node:
         self.__routing_table[destination] = channel
 
     def add_package(self, package):
-        self.packages.append(package)
+        self.packages.put(package)
 
     def add_Ki(self, package, node, Ki):
         # logging.debug(Ki)
